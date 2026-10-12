@@ -64,6 +64,7 @@ public abstract class AbstractAlertPolicyTask extends AbstractDigitalOceanTask {
     @Schema(title = "Notification channels")
     @NotNull
     @PluginProperty(group = "main")
+    @ToString.Exclude
     protected Property<AlertChannels> alerts;
 
     @Schema(title = "Whether the alert policy is enabled", description = "Defaults to true")

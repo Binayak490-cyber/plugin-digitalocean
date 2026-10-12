@@ -4,16 +4,19 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 
 import java.util.Map;
 
 @Builder
 @Getter
+@ToString
 @Jacksonized
 public class SlackAlert {
 
     @Schema(title = "Slack incoming webhook URL (input only; masked in outputs)", format = "password")
+    @ToString.Exclude
     private final String url;
 
     @NotNull

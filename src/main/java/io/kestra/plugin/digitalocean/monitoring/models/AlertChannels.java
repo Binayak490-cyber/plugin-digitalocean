@@ -3,6 +3,7 @@ package io.kestra.plugin.digitalocean.monitoring.models;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 
 import java.util.HashMap;
@@ -11,6 +12,7 @@ import java.util.Map;
 
 @Builder
 @Getter
+@ToString
 @Jacksonized
 public class AlertChannels {
 
