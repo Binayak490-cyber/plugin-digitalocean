@@ -4,7 +4,11 @@ import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.digitalocean.AbstractDigitalOceanTest;
+import io.kestra.plugin.digitalocean.monitoring.models.NetworkInterface;
+import io.kestra.plugin.digitalocean.monitoring.models.TrafficDirection;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -42,10 +46,10 @@ class DropletBandwidthTest extends AbstractDigitalOceanTest {
             .apiToken(Property.ofValue("secret-token"))
             .baseUrl(Property.ofValue(wm.getHttpBaseUrl()))
             .hostId(Property.ofValue("123456"))
-            .networkInterface(Property.ofValue("public"))
-            .direction(Property.ofValue("outbound"))
-            .start(Property.ofValue("1728000000"))
-            .end(Property.ofValue("1728003600"))
+            .networkInterface(Property.ofValue(NetworkInterface.PUBLIC))
+            .direction(Property.ofValue(TrafficDirection.OUTBOUND))
+            .start(Property.ofValue(Instant.ofEpochSecond(1728000000L)))
+            .end(Property.ofValue(Instant.ofEpochSecond(1728003600L)))
             .build();
 
         var output = task.run(runContext());
@@ -54,6 +58,6 @@ class DropletBandwidthTest extends AbstractDigitalOceanTest {
         assertThat(output.getData(), hasSize(1));
         assertThat(output.getData().getFirst().getMetric().get("direction"), is("outbound"));
         assertThat(output.getData().getFirst().getValues().getFirst().getValue(), is(1024.5));
-        verifyBearer(getRequestedFor(urlEqualTo("/v2/monitoring/metrics/droplet/bandwidth?host_id=123456&interface=public&direction=outbound&start=1728000000&end=1728003600")), "secret-token");
+        verifyBearer(getRequestedFor(urlEqualTo("/v2/monitoring/metrics/droplet/bandwidth?host_id=123456&start=1728000000&end=1728003600&interface=public&direction=outbound")), "secret-token");
     }
 }

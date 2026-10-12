@@ -5,6 +5,9 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.digitalocean.AbstractDigitalOceanTest;
 import io.kestra.plugin.digitalocean.monitoring.models.AlertChannels;
+import io.kestra.plugin.digitalocean.monitoring.models.Compare;
+import io.kestra.plugin.digitalocean.monitoring.models.PolicyType;
+import io.kestra.plugin.digitalocean.monitoring.models.Window;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -44,11 +47,11 @@ class UpdateTest extends AbstractDigitalOceanTest {
             .apiToken(Property.ofValue("secret-token"))
             .baseUrl(Property.ofValue(wm.getHttpBaseUrl()))
             .alertUuid(Property.ofValue("7343e061-e0c1-4b71-a476-c56dfaa3d2ad"))
-            .policyType(Property.ofValue("v1/insights/droplet/cpu"))
+            .policyType(Property.ofValue(PolicyType.CPU))
             .policyDescription(Property.ofValue("Updated alert"))
-            .compare(Property.ofValue("greater_than"))
+            .compare(Property.ofValue(Compare.GREATER_THAN))
             .value(Property.ofValue(90.0))
-            .window(Property.ofValue("10m"))
+            .window(Property.ofValue(Window.TEN_MINUTES))
             .alerts(Property.ofValue(AlertChannels.builder()
                 .email(List.of("ops@company.com"))
                 .build()))

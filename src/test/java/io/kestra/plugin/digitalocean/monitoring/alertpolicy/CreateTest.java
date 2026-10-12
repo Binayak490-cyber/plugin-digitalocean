@@ -5,7 +5,10 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.digitalocean.AbstractDigitalOceanTest;
 import io.kestra.plugin.digitalocean.monitoring.models.AlertChannels;
+import io.kestra.plugin.digitalocean.monitoring.models.Compare;
+import io.kestra.plugin.digitalocean.monitoring.models.PolicyType;
 import io.kestra.plugin.digitalocean.monitoring.models.SlackAlert;
+import io.kestra.plugin.digitalocean.monitoring.models.Window;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -42,11 +45,11 @@ class CreateTest extends AbstractDigitalOceanTest {
             .type(Create.class.getName())
             .apiToken(Property.ofValue("secret-token"))
             .baseUrl(Property.ofValue(wm.getHttpBaseUrl()))
-            .policyType(Property.ofValue("v1/insights/droplet/cpu"))
+            .policyType(Property.ofValue(PolicyType.CPU))
             .policyDescription(Property.ofValue("High CPU"))
-            .compare(Property.ofValue("greater_than"))
+            .compare(Property.ofValue(Compare.GREATER_THAN))
             .value(Property.ofValue(85.0))
-            .window(Property.ofValue("5m"))
+            .window(Property.ofValue(Window.FIVE_MINUTES))
             .alerts(Property.ofValue(AlertChannels.builder()
                 .email(List.of("ops@company.com"))
                 .slack(List.of(SlackAlert.builder().url("https://slack.com/hook").channel("#alerts").build()))
@@ -58,6 +61,9 @@ class CreateTest extends AbstractDigitalOceanTest {
         assertThat(output.getUuid(), is("new-policy-uuid"));
         assertThat(output.getDescription(), is("High CPU"));
         assertThat(output.getValue(), is(85.0));
+        // Verify URL is not exposed in output
+        assertThat(output.getAlerts().getSlack().getFirst().getUrl(), org.hamcrest.Matchers.nullValue());
+        assertThat(output.getAlerts().getSlack().getFirst().getChannel(), is("#alerts"));
         verifyBearer(postRequestedFor(urlPathEqualTo("/v2/monitoring/alerts")), "secret-token");
     }
 }

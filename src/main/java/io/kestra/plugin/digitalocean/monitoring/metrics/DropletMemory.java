@@ -7,9 +7,8 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
-import io.kestra.plugin.digitalocean.AbstractDigitalOceanTask;
+import io.kestra.plugin.digitalocean.monitoring.models.MemoryMetricType;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -18,8 +17,6 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 
 @SuperBuilder
 @ToString
@@ -44,52 +41,32 @@ import java.nio.charset.StandardCharsets;
                     type: io.kestra.plugin.digitalocean.monitoring.metrics.DropletMemory
                     apiToken: "{{ secret('DIGITALOCEAN_TOKEN') }}"
                     hostId: "12345678"
-                    metricType: "memory_available"
-                    start: "1728000000"
-                    end: "1728003600"
+                    metricType: MEMORY_AVAILABLE
+                    start: "{{ now() | dateAdd(-1, 'HOURS') }}"
+                    end: "{{ now() }}"
                 """
         )
     }
 )
-public class DropletMemory extends AbstractDigitalOceanTask implements RunnableTask<MetricsOutput> {
+public class DropletMemory extends AbstractDropletMetricsTask implements RunnableTask<MetricsOutput> {
 
-    @Schema(title = "Droplet host ID")
-    @NotNull
-    @PluginProperty(group = "main")
-    private Property<String> hostId;
-
-    @Schema(title = "Memory metric type", description = "memory_available, memory_free, memory_total, memory_cached. Defaults to memory_available.")
+    @Schema(title = "Memory metric type", description = "MEMORY_AVAILABLE, MEMORY_FREE, MEMORY_TOTAL, MEMORY_CACHED. Defaults to MEMORY_AVAILABLE.")
     @Builder.Default
     @PluginProperty(group = "main")
-    private Property<String> metricType = Property.ofValue("memory_available");
-
-    @Schema(title = "Start timestamp in UNIX epoch seconds")
-    @NotNull
-    @PluginProperty(group = "main")
-    private Property<String> start;
-
-    @Schema(title = "End timestamp in UNIX epoch seconds")
-    @NotNull
-    @PluginProperty(group = "main")
-    private Property<String> end;
+    private Property<MemoryMetricType> metricType = Property.ofValue(MemoryMetricType.MEMORY_AVAILABLE);
 
     @Override
     public MetricsOutput run(RunContext runContext) throws Exception {
         var logger = runContext.logger();
         var rHostId = requireRendered(runContext, hostId, String.class, "hostId");
-        var rMetricType = runContext.render(metricType).as(String.class).orElse("memory_available");
-        var rStart = requireRendered(runContext, start, String.class, "start");
-        var rEnd = requireRendered(runContext, end, String.class, "end");
+        var rMetricType = runContext.render(metricType).as(MemoryMetricType.class).orElse(MemoryMetricType.MEMORY_AVAILABLE);
         var rApiToken = renderApiToken(runContext);
         var rBaseUrl = renderBaseUrl(runContext);
 
         logger.info("Fetching {} metrics for Droplet {}", rMetricType, rHostId);
 
-        var query = "host_id=" + URLEncoder.encode(rHostId, StandardCharsets.UTF_8)
-            + "&start=" + URLEncoder.encode(rStart, StandardCharsets.UTF_8)
-            + "&end=" + URLEncoder.encode(rEnd, StandardCharsets.UTF_8);
-
-        var url = join(rBaseUrl, "v2/monitoring/metrics/droplet/" + encodePathSegment(rMetricType) + "?" + query);
+        var query = buildBaseQuery(runContext);
+        var url = join(rBaseUrl, "v2/monitoring/metrics/droplet/" + encodePathSegment(rMetricType.getValue()) + "?" + query);
         var requestBuilder = HttpRequest.builder().uri(URI.create(url)).method("GET");
         var body = requestJson(runContext, options, rApiToken, requestBuilder);
 

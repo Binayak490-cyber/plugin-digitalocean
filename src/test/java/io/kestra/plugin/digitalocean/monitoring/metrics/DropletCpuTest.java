@@ -6,6 +6,8 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.plugin.digitalocean.AbstractDigitalOceanTest;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -42,8 +44,8 @@ class DropletCpuTest extends AbstractDigitalOceanTest {
             .apiToken(Property.ofValue("secret-token"))
             .baseUrl(Property.ofValue(wm.getHttpBaseUrl()))
             .hostId(Property.ofValue("123456"))
-            .start(Property.ofValue("1728000000"))
-            .end(Property.ofValue("1728003600"))
+            .start(Property.ofValue(Instant.ofEpochSecond(1728000000L)))
+            .end(Property.ofValue(Instant.ofEpochSecond(1728003600L)))
             .build();
 
         var output = task.run(runContext());

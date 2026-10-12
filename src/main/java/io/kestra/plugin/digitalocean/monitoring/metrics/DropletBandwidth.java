@@ -7,9 +7,9 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
-import io.kestra.plugin.digitalocean.AbstractDigitalOceanTask;
+import io.kestra.plugin.digitalocean.monitoring.models.NetworkInterface;
+import io.kestra.plugin.digitalocean.monitoring.models.TrafficDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -44,59 +44,41 @@ import java.nio.charset.StandardCharsets;
                     type: io.kestra.plugin.digitalocean.monitoring.metrics.DropletBandwidth
                     apiToken: "{{ secret('DIGITALOCEAN_TOKEN') }}"
                     hostId: "12345678"
-                    networkInterface: "public"
-                    direction: "outbound"
-                    start: "1728000000"
-                    end: "1728003600"
+                    networkInterface: PUBLIC
+                    direction: OUTBOUND
+                    start: "{{ now() | dateAdd(-1, 'HOURS') }}"
+                    end: "{{ now() }}"
                 """
         )
     }
 )
-public class DropletBandwidth extends AbstractDigitalOceanTask implements RunnableTask<MetricsOutput> {
+public class DropletBandwidth extends AbstractDropletMetricsTask implements RunnableTask<MetricsOutput> {
 
-    @Schema(title = "Droplet host ID")
-    @NotNull
-    @PluginProperty(group = "main")
-    private Property<String> hostId;
-
-    @Schema(title = "Network interface", description = "public or private. Defaults to public.")
+    @Schema(title = "Network interface", description = "PUBLIC or PRIVATE. Defaults to PUBLIC.")
     @Builder.Default
     @PluginProperty(group = "main")
-    private Property<String> networkInterface = Property.ofValue("public");
+    private Property<NetworkInterface> networkInterface = Property.ofValue(NetworkInterface.PUBLIC);
 
-    @Schema(title = "Traffic direction", description = "inbound or outbound. Defaults to outbound.")
+    @Schema(title = "Traffic direction", description = "INBOUND or OUTBOUND. Defaults to OUTBOUND.")
     @Builder.Default
     @PluginProperty(group = "main")
-    private Property<String> direction = Property.ofValue("outbound");
-
-    @Schema(title = "Start timestamp in UNIX epoch seconds")
-    @NotNull
-    @PluginProperty(group = "main")
-    private Property<String> start;
-
-    @Schema(title = "End timestamp in UNIX epoch seconds")
-    @NotNull
-    @PluginProperty(group = "main")
-    private Property<String> end;
+    private Property<TrafficDirection> direction = Property.ofValue(TrafficDirection.OUTBOUND);
 
     @Override
     public MetricsOutput run(RunContext runContext) throws Exception {
         var logger = runContext.logger();
         var rHostId = requireRendered(runContext, hostId, String.class, "hostId");
-        var rInterface = runContext.render(networkInterface).as(String.class).orElse("public");
-        var rDirection = runContext.render(direction).as(String.class).orElse("outbound");
-        var rStart = requireRendered(runContext, start, String.class, "start");
-        var rEnd = requireRendered(runContext, end, String.class, "end");
+        var rInterface = runContext.render(networkInterface).as(NetworkInterface.class).orElse(NetworkInterface.PUBLIC);
+        var rDirection = runContext.render(direction).as(TrafficDirection.class).orElse(TrafficDirection.OUTBOUND);
         var rApiToken = renderApiToken(runContext);
         var rBaseUrl = renderBaseUrl(runContext);
 
         logger.info("Fetching {} {} bandwidth metrics for Droplet {}", rInterface, rDirection, rHostId);
 
-        var query = "host_id=" + URLEncoder.encode(rHostId, StandardCharsets.UTF_8)
-            + "&interface=" + URLEncoder.encode(rInterface, StandardCharsets.UTF_8)
-            + "&direction=" + URLEncoder.encode(rDirection, StandardCharsets.UTF_8)
-            + "&start=" + URLEncoder.encode(rStart, StandardCharsets.UTF_8)
-            + "&end=" + URLEncoder.encode(rEnd, StandardCharsets.UTF_8);
+        var baseQuery = buildBaseQuery(runContext);
+        var query = baseQuery
+            + "&interface=" + URLEncoder.encode(rInterface.getValue(), StandardCharsets.UTF_8)
+            + "&direction=" + URLEncoder.encode(rDirection.getValue(), StandardCharsets.UTF_8);
 
         var url = join(rBaseUrl, "v2/monitoring/metrics/droplet/bandwidth?" + query);
         var requestBuilder = HttpRequest.builder().uri(URI.create(url)).method("GET");

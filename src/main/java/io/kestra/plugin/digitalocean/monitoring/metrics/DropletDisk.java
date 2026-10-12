@@ -7,9 +7,8 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
-import io.kestra.plugin.digitalocean.AbstractDigitalOceanTask;
+import io.kestra.plugin.digitalocean.monitoring.models.DiskMetricType;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -18,8 +17,6 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 
 @SuperBuilder
 @ToString
@@ -28,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 @NoArgsConstructor
 @Schema(
     title = "Query DigitalOcean droplet disk metrics",
-    description = "Queries disk and filesystem metrics (filesystem_free, filesystem_size, read, write) for a specific Droplet over a time window."
+    description = "Queries disk and filesystem metrics (FILESYSTEM_FREE, FILESYSTEM_SIZE, DISK_READ, DISK_WRITE) for a specific Droplet over a time window."
 )
 @Plugin(
     examples = {
@@ -44,52 +41,32 @@ import java.nio.charset.StandardCharsets;
                     type: io.kestra.plugin.digitalocean.monitoring.metrics.DropletDisk
                     apiToken: "{{ secret('DIGITALOCEAN_TOKEN') }}"
                     hostId: "12345678"
-                    metricType: "filesystem_free"
-                    start: "1728000000"
-                    end: "1728003600"
+                    metricType: FILESYSTEM_FREE
+                    start: "{{ now() | dateAdd(-1, 'HOURS') }}"
+                    end: "{{ now() }}"
                 """
         )
     }
 )
-public class DropletDisk extends AbstractDigitalOceanTask implements RunnableTask<MetricsOutput> {
+public class DropletDisk extends AbstractDropletMetricsTask implements RunnableTask<MetricsOutput> {
 
-    @Schema(title = "Droplet host ID")
-    @NotNull
-    @PluginProperty(group = "main")
-    private Property<String> hostId;
-
-    @Schema(title = "Disk metric type", description = "filesystem_free, filesystem_size, read, write. Defaults to filesystem_free.")
+    @Schema(title = "Disk metric type", description = "FILESYSTEM_FREE, FILESYSTEM_SIZE, DISK_READ, DISK_WRITE. Defaults to FILESYSTEM_FREE.")
     @Builder.Default
     @PluginProperty(group = "main")
-    private Property<String> metricType = Property.ofValue("filesystem_free");
-
-    @Schema(title = "Start timestamp in UNIX epoch seconds")
-    @NotNull
-    @PluginProperty(group = "main")
-    private Property<String> start;
-
-    @Schema(title = "End timestamp in UNIX epoch seconds")
-    @NotNull
-    @PluginProperty(group = "main")
-    private Property<String> end;
+    private Property<DiskMetricType> metricType = Property.ofValue(DiskMetricType.FILESYSTEM_FREE);
 
     @Override
     public MetricsOutput run(RunContext runContext) throws Exception {
         var logger = runContext.logger();
         var rHostId = requireRendered(runContext, hostId, String.class, "hostId");
-        var rMetricType = runContext.render(metricType).as(String.class).orElse("filesystem_free");
-        var rStart = requireRendered(runContext, start, String.class, "start");
-        var rEnd = requireRendered(runContext, end, String.class, "end");
+        var rMetricType = runContext.render(metricType).as(DiskMetricType.class).orElse(DiskMetricType.FILESYSTEM_FREE);
         var rApiToken = renderApiToken(runContext);
         var rBaseUrl = renderBaseUrl(runContext);
 
         logger.info("Fetching {} disk metrics for Droplet {}", rMetricType, rHostId);
 
-        var query = "host_id=" + URLEncoder.encode(rHostId, StandardCharsets.UTF_8)
-            + "&start=" + URLEncoder.encode(rStart, StandardCharsets.UTF_8)
-            + "&end=" + URLEncoder.encode(rEnd, StandardCharsets.UTF_8);
-
-        var url = join(rBaseUrl, "v2/monitoring/metrics/droplet/" + encodePathSegment(rMetricType) + "?" + query);
+        var query = buildBaseQuery(runContext);
+        var url = join(rBaseUrl, "v2/monitoring/metrics/droplet/" + encodePathSegment(rMetricType.getValue()) + "?" + query);
         var requestBuilder = HttpRequest.builder().uri(URI.create(url)).method("GET");
         var body = requestJson(runContext, options, rApiToken, requestBuilder);
 

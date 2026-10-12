@@ -11,6 +11,10 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @SuperBuilder
 @ToString
 @EqualsAndHashCode
@@ -18,7 +22,8 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Schema(
     title = "List DigitalOcean monitoring alert policies",
-    description = "Lists all alert policies on the account, following DigitalOcean's page-based pagination automatically."
+    description = "Lists all alert policies on the account, following DigitalOcean's page-based pagination automatically. " +
+        "Sensitive Slack incoming webhook URLs are masked/stripped from outputs."
 )
 @Plugin(
     examples = {
@@ -55,5 +60,29 @@ public class List extends AbstractDigitalOceanListTask {
     @Override
     protected String resourceLabel() {
         return "alert policy(ies)";
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    protected java.util.List<Map<String, Object>> transformRows(RunContext runContext, java.util.List<Map<String, Object>> rows) {
+        return rows.stream().map(policy -> {
+            var sanitized = new LinkedHashMap<>(policy);
+            if (sanitized.get("alerts") instanceof Map<?, ?> alertsMap) {
+                var copyAlerts = new LinkedHashMap<>((Map<String, Object>) alertsMap);
+                if (copyAlerts.get("slack") instanceof java.util.List<?> slackList) {
+                    var sanitizedSlack = new ArrayList<Map<String, Object>>();
+                    for (Object item : slackList) {
+                        if (item instanceof Map<?, ?> itemMap) {
+                            var mapCopy = new LinkedHashMap<String, Object>((Map<String, Object>) itemMap);
+                            mapCopy.remove("url");
+                            sanitizedSlack.add(mapCopy);
+                        }
+                    }
+                    copyAlerts.put("slack", sanitizedSlack);
+                }
+                sanitized.put("alerts", copyAlerts);
+            }
+            return (Map<String, Object>) sanitized;
+        }).toList();
     }
 }

@@ -13,8 +13,7 @@ import java.util.Map;
 @Jacksonized
 public class SlackAlert {
 
-    @NotNull
-    @Schema(title = "Slack incoming webhook URL")
+    @Schema(title = "Slack incoming webhook URL (input only; masked in outputs)", format = "password")
     private final String url;
 
     @NotNull
@@ -22,6 +21,9 @@ public class SlackAlert {
     private final String channel;
 
     public Map<String, Object> toMap() {
+        if (url == null) {
+            return Map.of("channel", channel);
+        }
         return Map.of(
             "url", url,
             "channel", channel
@@ -33,7 +35,6 @@ public class SlackAlert {
             return null;
         }
         return SlackAlert.builder()
-            .url(map.get("url") != null ? map.get("url").toString() : null)
             .channel(map.get("channel") != null ? map.get("channel").toString() : null)
             .build();
     }
