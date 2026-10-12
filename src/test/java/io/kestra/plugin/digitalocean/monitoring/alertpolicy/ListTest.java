@@ -53,8 +53,20 @@ class ListTest extends AbstractDigitalOceanTest {
         assertThat(output.getTotal(), is(1L));
         assertThat(output.getSize(), is(1));
         assertThat(output.getRows(), notNullValue());
-        assertThat(output.getRows().getFirst().get("uuid"), is("7343e061-e0c1-4b71-a476-c56dfaa3d2ad"));
-        assertThat(output.getRows().getFirst().get("description"), is("High CPU alert"));
+        var firstRow = output.getRows().getFirst();
+        assertThat(firstRow.get("uuid"), is("7343e061-e0c1-4b71-a476-c56dfaa3d2ad"));
+        assertThat(firstRow.get("description"), is("High CPU alert"));
+
+        // Verify Slack webhook URL is stripped from rows for security
+        @SuppressWarnings("unchecked")
+        var alerts = (java.util.Map<String, Object>) firstRow.get("alerts");
+        assertThat(alerts, notNullValue());
+        @SuppressWarnings("unchecked")
+        var slack = (java.util.List<java.util.Map<String, Object>>) alerts.get("slack");
+        assertThat(slack, notNullValue());
+        assertThat(slack.getFirst(), hasEntry("channel", "#alerts"));
+        assertThat(slack.getFirst().containsKey("url"), is(false));
+
         verifyBearer(getRequestedFor(urlEqualTo("/v2/monitoring/alerts?per_page=200")), "secret-token");
     }
 
@@ -75,5 +87,14 @@ class ListTest extends AbstractDigitalOceanTest {
         assertThat(output.getRow(), notNullValue());
         assertThat(output.getRow().get("uuid"), is("7343e061-e0c1-4b71-a476-c56dfaa3d2ad"));
         assertThat(output.getRows(), nullValue());
+
+        @SuppressWarnings("unchecked")
+        var alerts = (java.util.Map<String, Object>) output.getRow().get("alerts");
+        assertThat(alerts, notNullValue());
+        @SuppressWarnings("unchecked")
+        var slack = (java.util.List<java.util.Map<String, Object>>) alerts.get("slack");
+        assertThat(slack, notNullValue());
+        assertThat(slack.getFirst(), hasEntry("channel", "#alerts"));
+        assertThat(slack.getFirst().containsKey("url"), is(false));
     }
 }
